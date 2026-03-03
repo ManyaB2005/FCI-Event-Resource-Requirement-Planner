@@ -1,0 +1,62 @@
+.admin-folder-container { padding: 30px; background: #f8fafc; min-height: 100vh; }
+.page-title h1 { color: #1e293b; margin: 0; }
+.page-title h1 span { color: #4f46e5; }
+
+.folders-grid { margin-top: 25px; display: flex; flex-direction: column; gap: 10px; }
+
+.folder-wrapper {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.folder-tab {
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.folder-tab:hover { background: #f1f5f9; }
+
+.tab-left { display: flex; align-items: center; gap: 12px; color: #334155; }
+.folder-icon-color { color: #facc15; fill: #fef9c3; } /* Yellow folder look */
+.class-label { font-weight: 700; font-size: 15px; }
+
+.count-badge {
+  font-size: 11px;
+  font-weight: 800;
+  background: #eef2ff;
+  color: #4f46e5;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.folder-details {
+  padding: 10px 20px 20px 50px;
+  background: #fafafa;
+  border-top: 1px solid #f1f5f9;
+}
+
+.student-list-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.student-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px;
+}
+
+.std-info { display: flex; align-items: center; gap: 8px; color: #1e293b; font-weight: 600; }
+.std-date { color: #64748b; display: flex; align-items: center; gap: 5px; font-size: 12px; }

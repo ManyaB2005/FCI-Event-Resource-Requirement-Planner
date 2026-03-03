@@ -1,0 +1,59 @@
+/* App.css */
+:root {
+  --sidebar-width: 260px;
+  --sidebar-collapsed: 85px;
+  --bg-dark: #0b1120; /* Matching our Command Center theme */
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: var(--bg-dark);
+}
+
+.app-container {
+  display: flex; /* Sidebar and Main sit side-by-side */
+  min-height: 100vh;
+}
+
+.main-viewport {
+  flex: 1; /* Takes up remaining space */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: var(--bg-dark);
+  min-height: 100vh;
+}
+
+/* Push content so it doesn't get hidden behind the Sidebar */
+.sidebar-expanded {
+  margin-left: var(--sidebar-width);
+}
+
+.sidebar-collapsed {
+  margin-left: var(--sidebar-collapsed);
+}
+
+.content-wrapper {
+  padding: 0; /* Dashboard handles its own padding */
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* Loading screen styling */
+.loading-init {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-dark);
+  color: #6366f1;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+}
+
+/* Responsive: On mobile, sidebar should probably be an overlay */
+@media (max-width: 768px) {
+  .sidebar-expanded, .sidebar-collapsed {
+    margin-left: 0;
+  }
+}

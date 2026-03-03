@@ -1,0 +1,65 @@
+:root {
+  --primary: #1e293b;       /* Dark Slate - Professional/Trustworthy */
+  --accent: #4f46e5;        /* Indigo - Modern Action */
+  --bg-main: #f8fafc;       /* Off-white background */
+  --bg-card: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --success: #10b981;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+/* Sidebar Styling */
+.sidebar {
+  background-color: var(--primary);
+  color: white;
+  box-shadow: 4px 0 10px rgba(0,0,0,0.05);
+}
+
+/* Professional Cards */
+.event-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.event-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Input Fields */
+.input-style {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  transition: border-color 0.2s;
+}
+
+.input-style:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--accent);
+  color: white;
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 8px 16px;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background-color: #4338ca;
+}
