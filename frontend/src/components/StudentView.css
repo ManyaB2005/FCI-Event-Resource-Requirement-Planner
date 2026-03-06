@@ -1,83 +1,39 @@
-.student-view {
-  max-width: 1400px;
-  margin: 0 auto;
-}
+.student-view-container { padding: 40px; background: #f8fafc; min-height: 100vh; }
+.sv-header h1 { font-size: 28px; color: #1e293b; margin: 0; }
+.sv-header h1 span { color: #4f46e5; }
+.sv-header p { color: #64748b; margin-top: 5px; }
 
-.page-header {
-  margin-bottom: 24px;
-}
+.sv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 24px; margin-top: 30px; }
 
-.page-header h1 {
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
+.sv-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; }
+.sv-card-header { padding: 20px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+.sv-card-header h3 { margin: 0; color: #1e293b; font-size: 18px; }
+.sv-date { display: flex; align-items: center; gap: 6px; color: #64748b; font-size: 13px; font-weight: 600; }
 
-.subtitle {
-  color: var(--text-secondary);
-  font-size: 16px;
-}
+.sv-card-body { padding: 20px; }
+.ppt-submission-area { background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px dashed #cbd5e1; }
+.area-title { margin: 0 0 16px 0; font-size: 14px; text-transform: uppercase; color: #475569; letter-spacing: 0.5px; }
 
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-secondary);
-  grid-column: 1 / -1;
-}
+.drive-instruction, .link-instruction { margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px; }
+.drive-instruction span, .link-instruction span { font-size: 14px; font-weight: 600; color: #334155; }
 
-.empty-state svg {
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
+.btn-drive-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #eef2ff; color: #4f46e5; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 14px; transition: background 0.2s; border: 1px solid #c7d2fe; }
+.btn-drive-link:hover { background: #e0e7ff; }
 
-.event-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-}
+.submit-action-row { display: flex; gap: 10px; }
+.input-with-icon { position: relative; flex: 1; }
+.input-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+.input-with-icon input { width: 100%; padding: 10px 10px 10px 36px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; transition: border-color 0.2s; }
+.input-with-icon input:focus { border-color: #4f46e5; }
 
-.student-card {
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-}
+.btn-submit-ppt { background: #4f46e5; color: white; border: none; padding: 0 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.btn-submit-ppt:hover:not(:disabled) { background: #4338ca; }
+.btn-submit-ppt:disabled { opacity: 0.7; cursor: not-allowed; }
 
-.student-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-  border-color: #667eea;
-}
+.submitted-success { display: flex; align-items: center; gap: 8px; background: #f0fdf4; color: #15803d; padding: 10px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; border: 1px solid #bbf7d0; }
+.submitted-success a { color: #16a34a; margin-left: auto; text-decoration: none; display: flex; align-items: center; gap: 4px; }
+.submitted-success a:hover { text-decoration: underline; }
 
-.detail-item {
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.btn-primary {
-  padding: 10px 22px;
-  border-radius: 8px;
-  border: none;
-  background: var(--primary-gradient);
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-primary:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-
-.btn-primary:disabled {
-  background: #ccc;
-  color: #666;
-  box-shadow: none;
-}
+.no-ppt-required { display: flex; align-items: center; gap: 10px; background: #f8fafc; padding: 16px; border-radius: 12px; color: #475569; font-weight: 600; }
+.text-green { color: #10b981; }
+.error-text { color: #ef4444; font-size: 13px; }

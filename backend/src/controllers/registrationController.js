@@ -1,25 +1,80 @@
-// backend/controllers/registrationController.js
-const db = require('../config/db'); // Your database connection
+const pool = require('../config/db');
 
-exports.registerForEvent = async (req, res) => {
-    const { event_id } = req.body;
-    const student_id = req.user.id; // Taken from JWT token
+exports.getAllRegistrations = async (req, res) => {
+    // Security check: Admins only
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Admins only." });
+    }
 
     try {
-        // 1. Check if already registered
-        const [existing] = await db.execute(
-            'SELECT id FROM registrations WHERE student_id = ? AND event_id = ?',
-            [student_id, event_id]
+        const query = `
+            SELECT 
+                r.registration_id,
+                u.name AS student_name,
+                u.email AS student_email,
+                c.name AS class_name,
+                c.requires_ppt,
+                r.presentation_link,
+                e.name AS event_name
+            FROM registrations r
+            INNER JOIN users u ON r.user_id = u.user_id
+            INNER JOIN classes c ON r.class_id = c.class_id
+            LEFT JOIN class_folders f ON c.folder_id = f.folder_id
+            LEFT JOIN events e ON f.event_id = e.event_id
+            ORDER BY c.name ASC, u.name ASC
+        `;
+        
+        const [rows] = await pool.query(query);
+
+        // Grouping the data by Class Name for the Admin Table
+        const grouped = rows.reduce((acc, reg) => {
+            const className = reg.class_name || "Unassigned Class";
+            if (!acc[className]) acc[className] = [];
+            
+            // Generate the status text
+            let status = "N/A";
+            if (reg.requires_ppt) {
+                // If presentation_link has ANY value (COMPLETED or a link), it's Uploaded
+                status = (reg.presentation_link && reg.presentation_link.trim() !== "") 
+                         ? "Uploaded" 
+                         : "Not Uploaded";
+            }
+
+            acc[className].push({
+                id: reg.registration_id,
+                student: reg.student_name,
+                email: reg.student_email,
+                status: status,
+                event: reg.event_name || "N/A"
+            });
+            return acc;
+        }, {});
+
+        res.json(grouped);
+    } catch (error) {
+        console.error("Error fetching registrations:", error);
+        res.status(500).json({ message: "Server error while fetching registrations." });
+    }
+};
+
+// STUDENT: Register for a class
+exports.registerForEvent = async (req, res) => {
+    const { class_id } = req.body;
+    const user_id = req.user.id;
+
+    try {
+        const [existing] = await pool.query(
+            'SELECT registration_id FROM registrations WHERE user_id = ? AND class_id = ?',
+            [user_id, class_id]
         );
 
         if (existing.length > 0) {
             return res.status(400).json({ message: "You are already registered for this class." });
         }
 
-        // 2. Insert the registration
-        await db.execute(
-            'INSERT INTO registrations (student_id, event_id, created_at) VALUES (?, ?, NOW())',
-            [student_id, event_id]
+        await pool.query(
+            'INSERT INTO registrations (user_id, class_id) VALUES (?, ?)',
+            [user_id, class_id]
         );
 
         res.status(201).json({ message: "Successfully registered!" });
@@ -28,24 +83,24 @@ exports.registerForEvent = async (req, res) => {
     }
 };
 
-// This is what the Admin calls to see the "Folders"
-exports.getAdminRegistrations = async (req, res) => {
+// STUDENT: Mark PPT as uploaded
+exports.submitPresentationLink = async (req, res) => {
+    const registrationId = req.params.id;
+    const { presentation_link } = req.body;
+    const user_id = req.user.id;
+
     try {
-        const query = `
-             darkness SELECT 
-                r.id, 
-                u.name AS student_name, 
-                e.title AS event_name, 
-                r.created_at,
-                r.presentation_link
-            FROM registrations r
-            JOIN users u ON r.student_id = u.id
-            JOIN events e ON r.event_id = e.id
-            ORDER BY e.title ASC, r.created_at DESC
-        `;
-        const [rows] = await db.execute(query);
-        res.json(rows);
+        const [result] = await pool.query(
+            'UPDATE registrations SET presentation_link = ? WHERE registration_id = ? AND user_id = ?',
+            [presentation_link || "COMPLETED", registrationId, user_id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Registration not found or unauthorized." });
+        }
+
+        res.status(200).json({ message: "Status updated successfully." });
     } catch (error) {
-        res.status(500).json({ message: "Error fetching registrations" });
+        res.status(500).json({ message: "Server error", error: error.message });
     }
 };

@@ -1,20 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const verifyToken = require('../middleware/authMiddleware');
-const { 
-  getAvailableClasses, getMyRegistrations, getNotifications, registerForClass, submitPresentationEmail 
-} = require('../controllers/studentController');
+const studentController = require('../controllers/studentController');
+const { verifyToken } = require('../middleware/authMiddleware'); // You imported it as verifyToken
 
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 } 
-});
+// Route 1: Available Classes
+router.get('/classes', verifyToken, studentController.getAvailableClasses);
 
-router.get('/notifications', verifyToken, getNotifications);
-router.get('/classes', verifyToken, getAvailableClasses);
-router.post('/classes/:classId/register', verifyToken, registerForClass);
-router.get('/my-registrations', verifyToken, getMyRegistrations);
-router.post('/classes/:classId/ppt-email', verifyToken, upload.single('presentation'), submitPresentationEmail);
+// Route 2: Register
+router.post('/classes/:classId/register', verifyToken, studentController.registerForClass);
+
+// Route 3: My Registrations
+router.get('/my-registrations', verifyToken, studentController.getMyRegistrations);
+
+// Route 4: Mark as Uploaded (Using verifyToken instead of authMiddleware)
+router.put('/registrations/:registrationId/upload', verifyToken, studentController.markAsUploaded);
 
 module.exports = router;

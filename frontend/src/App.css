@@ -1,59 +1,87 @@
-/* App.css */
-:root {
-  --sidebar-width: 260px;
-  --sidebar-collapsed: 85px;
-  --bg-dark: #0b1120; /* Matching our Command Center theme */
-}
+/* --- Global Reset & Font --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-body, html {
+body {
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
-  background-color: var(--bg-dark);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f1f5f9; /* Soft dashboard gray/blue */
+  color: #334155;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* --- Layout Structure --- */
 .app-container {
-  display: flex; /* Sidebar and Main sit side-by-side */
-  min-height: 100vh;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #f1f5f9;
 }
 
 .main-viewport {
-  flex: 1; /* Takes up remaining space */
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background-color: var(--bg-dark);
-  min-height: 100vh;
-}
-
-/* Push content so it doesn't get hidden behind the Sidebar */
-.sidebar-expanded {
-  margin-left: var(--sidebar-width);
-}
-
-.sidebar-collapsed {
-  margin-left: var(--sidebar-collapsed);
-}
-
-.content-wrapper {
-  padding: 0; /* Dashboard handles its own padding */
-  max-width: 1600px;
-  margin: 0 auto;
-}
-
-/* Loading screen styling */
-.loading-init {
+  flex: 1;
   height: 100vh;
+  overflow-y: auto;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+/* --- Main Content Area --- */
+.content-wrapper {
+  padding: 10px;
+  min-height: 100%;
+  animation: pageFadeIn 0.4s ease-out;
+}
+
+/* Smooth page load animation */
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Global Loading Screen --- */
+.loading-init {
   display: flex;
+  height: 100vh;
   align-items: center;
   justify-content: center;
-  background: var(--bg-dark);
-  color: #6366f1;
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #4f46e5;
+  background: #f8fafc;
+  animation: pulse 2s infinite ease-in-out;
 }
 
-/* Responsive: On mobile, sidebar should probably be an overlay */
-@media (max-width: 768px) {
-  .sidebar-expanded, .sidebar-collapsed {
-    margin-left: 0;
-  }
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* --- Reusable Card Class for any future components --- */
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  border-radius: 12px;
+}
+
+.main-viewport {
+  flex: 1;
+  height: 100vh;
+  overflow-y: auto;
+  position: relative;
+  /* ADD THIS: Subtle glowing mesh background */
+  background-color: #f8fafc;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.04) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(192, 132, 252, 0.04) 0px, transparent 50%);
+  background-attachment: fixed;
 }

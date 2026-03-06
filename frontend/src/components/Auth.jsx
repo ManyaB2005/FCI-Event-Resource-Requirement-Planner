@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, User, Shield } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Shield, Users } from 'lucide-react';
 import './Auth.css';
 
 const Auth = ({ setToken, setUser }) => {
@@ -10,12 +10,14 @@ const Auth = ({ setToken, setUser }) => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // 1. ADDED 'batch' to the initial state
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '', 
-    role: 'student' 
+    role: 'student',
+    batch: '' 
   });
 
   const handleChange = (e) => {
@@ -33,14 +35,15 @@ const Auth = ({ setToken, setUser }) => {
     }
 
     setLoading(true);
-    // Explicit API definition to avoid relative path errors in React mapping
     const endpoint = isLogin ? 'http://localhost:5000/api/auth/login' : 'http://localhost:5000/api/auth/register';
     
+    // 2. ADDED 'batch' to the payload being sent to the backend
     const payload = {
       name: formData.name,
       email: formData.email,
       password: formData.password,
-      role: isLogin ? formData.role : 'student' 
+      role: isLogin ? formData.role : 'student',
+      batch: formData.batch 
     };
 
     try {
@@ -50,13 +53,12 @@ const Auth = ({ setToken, setUser }) => {
         body: JSON.stringify(payload)
       });
 
-      // 1. Validate response before processing payload
       const contentType = response.headers.get("content-type");
       
       let data = {};
       
       if (contentType && contentType.includes("application/json")) {
-         data = await response.json(); // Safe to parse JSON
+         data = await response.json(); 
       } else {
          const textError = await response.text();
          console.error("Non-JSON Server Response:", textError);
@@ -80,7 +82,8 @@ const Auth = ({ setToken, setUser }) => {
       } else {
         setSuccess("Account created successfully! You can now log in.");
         setIsLogin(true); 
-        setFormData({ ...formData, password: '', confirmPassword: '' });
+        // Reset passwords and batch upon successful registration
+        setFormData({ ...formData, password: '', confirmPassword: '', batch: '' });
       }
     } catch (err) {
       setError(err.message);
@@ -114,20 +117,38 @@ const Auth = ({ setToken, setUser }) => {
         <form onSubmit={handleSubmit} className="auth-form">
           
           {!isLogin && (
-            <div className="input-group">
-              <label>Full Name</label>
-              <div className="input-wrapper">
-                <User className="input-icon" size={18} />
-                <input 
-                  type="text" 
-                  name="name" 
-                  placeholder="e.g. Jane Doe" 
-                  value={formData.name} 
-                  onChange={handleChange} 
-                  required={!isLogin} 
-                />
+            <>
+              <div className="input-group">
+                <label>Full Name</label>
+                <div className="input-wrapper">
+                  <User className="input-icon" size={18} />
+                  <input 
+                    type="text" 
+                    name="name" 
+                    placeholder="e.g. Jane Doe" 
+                    value={formData.name} 
+                    onChange={handleChange} 
+                    required={!isLogin} 
+                  />
+                </div>
               </div>
-            </div>
+
+              {/* 3. ADDED the new Batch input field for Student Registration */}
+              <div className="input-group">
+                <label>Batch</label>
+                <div className="input-wrapper">
+                  <Users className="input-icon" size={18} />
+                  <input 
+                    type="text" 
+                    name="batch" 
+                    placeholder="e.g. 5" 
+                    value={formData.batch} 
+                    onChange={handleChange} 
+                    required={!isLogin} 
+                  />
+                </div>
+              </div>
+            </>
           )}
 
           <div className="input-group">

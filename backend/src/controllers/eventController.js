@@ -1,14 +1,5 @@
 const pool = require('../config/db');
-const nodemailer = require('nodemailer');
-
-// Set up the email sender
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+const { sendClassNotification } = require('../utils/emailService');
 
 exports.getDashboardStats = async (req, res) => {
   try {
@@ -58,13 +49,13 @@ exports.getAllEvents = async (req, res) => {
 
 // --- EVENT CRUD ---
 exports.createEvent = async (req, res) => {
-  const { name, type, description, start_date, end_date } = req.body;
+  const { name, description, start_date, end_date } = req.body;
   try {
     const [result] = await pool.query(
-      'INSERT INTO events (name, type, description, start_date, end_date) VALUES (?, ?, ?, ?, ?)',
-      [name, type || 'Training', description, start_date, end_date]
+      'INSERT INTO events (name, description, start_date, end_date) VALUES (?, ?, ?, ?)',
+      [name, description, start_date, end_date]
     );
-    await pool.query('INSERT INTO notifications (message) VALUES (?)', [`New Event Announced: ${name}`]);
+    await pool.query('INSERT INTO notifications (message, type) VALUES (?, ?)', [`New Event Announced: ${name}`, 'announcement']);
     res.status(201).json({ message: "Event created successfully", event_id: result.insertId });
   } catch (error) {
     console.error("Error creating event:", error);
@@ -98,9 +89,12 @@ exports.deleteEvent = async (req, res) => {
 // --- FOLDER CRUD ---
 exports.createFolder = async (req, res) => {
   const { eventId } = req.params;
-  const { name } = req.body;
+  const { name, batch } = req.body; 
   try {
-    const [result] = await pool.query('INSERT INTO class_folders (event_id, name) VALUES (?, ?)', [eventId, name]);
+    const [result] = await pool.query(
+      'INSERT INTO class_folders (event_id, name, batch) VALUES (?, ?, ?)', 
+      [eventId, name, batch || null]
+    );
     res.status(201).json({ message: "Folder created", folder_id: result.insertId });
   } catch (error) {
     console.error("Error creating folder:", error);
@@ -108,35 +102,58 @@ exports.createFolder = async (req, res) => {
   }
 };
 
+exports.deleteFolder = async (req, res) => {
+  const { folderId } = req.params;
+  try {
+    await pool.query('DELETE FROM class_folders WHERE folder_id = ?', [folderId]);
+    res.json({ message: "Folder deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting folder:", error);
+    res.status(500).json({ message: "Failed to delete folder. Ensure classes inside are deleted first." });
+  }
+};
+
 // --- CLASS CRUD ---
 exports.createClass = async (req, res) => {
   const { folderId } = req.params;
-  const { name, date, time, venue, trainer_name, seat_limit, requires_ppt } = req.body;
+  const { name, date, time, venue, seat_limit, requires_ppt, drive_link, resources } = req.body;
   
   try {
+    // 1. Save the class to the database
     const [result] = await pool.query(
-      `INSERT INTO classes (folder_id, name, date, time, venue, trainer_name, seat_limit, requires_ppt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [folderId, name, date, time, venue, trainer_name, seat_limit || 0, requires_ppt || false]
+      'INSERT INTO classes (folder_id, name, date, time, venue, seat_limit, requires_ppt, drive_link) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [folderId, name, date, time, venue, seat_limit, requires_ppt, drive_link]
     );
-    
-    await pool.query('INSERT INTO notifications (message) VALUES (?)', [`New Class Scheduled: ${name} on ${date}`]);
-    
-    try {
-        const [students] = await pool.query("SELECT email FROM users WHERE role = 'student' AND is_active = TRUE");
-        if (students.length > 0) {
-            const emailList = students.map(s => s.email).join(',');
-            const mailOptions = {
-                from: process.env.EMAIL_USER, to: process.env.EMAIL_USER, bcc: emailList,
-                subject: `📢 New Class Scheduled: ${name}`,
-                text: `Hello,\n\nA new class has just been scheduled!\n\nDetails:\n- Topic: ${name}\n- Date: ${date}\n- Time: ${time}\n- Venue: ${venue}\n\nLog in to your dashboard to register!\n\nBest,\nFCI Administration`
-            };
-            await transporter.sendMail(mailOptions);
-        }
-    } catch (emailErr) {
-        console.error("Failed to send broadcast email:", emailErr);
+    const classId = result.insertId;
+
+    // Save resources if any exist
+    if (resources && resources.length > 0) {
+      for (let res of resources) {
+        await pool.query(
+          'INSERT INTO resources (class_id, name, quantity) VALUES (?, ?, ?)',
+          [classId, res.name, res.quantity]
+        );
+      }
     }
 
-    res.status(201).json({ message: "Class created!", class_id: result.insertId });
+    // --- AUTOMATION START ---
+    
+    // 2. Post to the Updates/Notification Feed automatically
+    const announcementMsg = `New Class Added: ${name} is scheduled for ${new Date(date).toLocaleDateString()} at ${venue || 'TBA'}.`;
+    await pool.query('INSERT INTO notifications (message, type) VALUES (?, ?)', [announcementMsg, 'announcement']);
+
+    // 3. Fetch all active student emails
+    const [students] = await pool.query('SELECT email FROM users WHERE role = "student"');
+    const studentEmails = students.map(s => s.email);
+
+    // 4. Send the email (runs in background)
+    if (studentEmails.length > 0) {
+      sendClassNotification(name, date, time, venue, studentEmails);
+    }
+
+    // --- AUTOMATION END ---
+
+    res.status(201).json({ message: "Class created, feed updated, and emails sent!", class_id: classId });
   } catch (error) {
     console.error("Error creating class:", error);
     res.status(500).json({ message: "Failed to create class" });
@@ -145,14 +162,15 @@ exports.createClass = async (req, res) => {
 
 exports.updateClass = async (req, res) => {
   const { classId } = req.params;
-  const { name, date, time, venue, seat_limit, resources, requires_ppt } = req.body;
+  const { name, date, time, venue, seat_limit, resources, requires_ppt, drive_link } = req.body;
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
+    
     await connection.query(
-      'UPDATE classes SET name=?, date=?, time=?, venue=?, seat_limit=?, requires_ppt=? WHERE class_id=?',
-      [name, date, time, venue, seat_limit || 0, requires_ppt || false, classId]
+      'UPDATE classes SET name=?, date=?, time=?, venue=?, seat_limit=?, requires_ppt=?, drive_link=? WHERE class_id=?',
+      [name, date, time, venue, seat_limit || 0, requires_ppt || false, drive_link || null, classId]
     );
 
     await connection.query('DELETE FROM resources WHERE class_id=?', [classId]);
@@ -217,7 +235,6 @@ exports.updateResourceStatus = async (req, res) => {
   }
 };
 
-// Add a single resource directly from the Planning Dashboard
 exports.addSingleResource = async (req, res) => {
   const { classId } = req.params;
   const { name, quantity } = req.body;

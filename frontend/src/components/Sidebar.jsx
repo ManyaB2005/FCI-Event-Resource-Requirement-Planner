@@ -1,106 +1,87 @@
-import React from "react";
-import { Link, useLocation } from "react-router-dom";
-import { 
-  LayoutDashboard, Calendar, Menu, X, LogOut, 
-  Settings, UserCircle, Bell, Briefcase, Users // Added Users icon
-} from "lucide-react";
-import "./Sidebar.css";
+import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Calendar, Users, Settings as SettingsIcon, LogOut, Bell, ClipboardList, Menu } from 'lucide-react';
+import './Sidebar.css'; // Relies on your original CSS
 
 const Sidebar = ({ isOpen, toggleSidebar, user, onLogout }) => {
   const location = useLocation();
+  const navigate = useNavigate();
 
-  // Updated menu logic to include the "Registrations" tab
-  const menuItems = [
-    { 
-      section: "Main",
-      items: [
-        { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-        { path: "/events", icon: Calendar, label: user?.role === "admin" ? "Event Management" : "My Classes" },
-      ]
-    },
-    {
-      section: "Management",
-      items: user?.role === "admin" ? [
-        { path: "/registrations", icon: Users, label: "Student Enrollments" }, // This is your new tab!
-        { path: "/resources", icon: Briefcase, label: "Resources" },
-        { path: "/students", icon: UserCircle, label: "Student Directory" },
-      ] : [
-        { path: "/notifications", icon: Bell, label: "Updates" },
-      ]
-    }
-  ];
+  // Helper to change the route
+  const handleNavigation = (path) => {
+    navigate(path);
+  };
 
-  const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : "U";
+  // Helper to check if a tab is active
+  const isActive = (path) => location.pathname === path;
 
   return (
-    <>
-      <aside className={`sidebar-container ${isOpen ? "is-open" : "is-collapsed"}`}>
+    <aside className={`sidebar ${isOpen ? 'open' : 'closed'}`}>
+      
+      {/* Sidebar Header */}
+      <div className="sidebar-header">
+        {isOpen && <h2>FCI Planner</h2>}
+        <button className="toggle-btn" onClick={toggleSidebar}>
+          <Menu size={24} />
+        </button>
+      </div>
+
+      {/* Navigation Links */}
+      <nav className="sidebar-nav">
         
-        {/* Branding Section */}
-        <div className="sidebar-brand">
-          <div className="brand-logo">
-            <div className="logo-square">E</div>
-            {isOpen && <span className="brand-name">Event<span>Ops</span></span>}
-          </div>
-          <button className="toggle-control" onClick={toggleSidebar}>
-            {isOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
+        {/* Dashboard */}
+        <div className={`sidebar-item ${isActive('/') ? 'active' : ''}`} onClick={() => handleNavigation('/')}>
+          <LayoutDashboard size={20} className="icon" />
+          {isOpen && <span>Dashboard</span>}
         </div>
 
-        {/* User Identity */}
-        <div className={`sidebar-user ${!isOpen ? 'centered' : ''}`}>
-          <div className="avatar-ring">
-            <div className="avatar-main">{getInitials(user?.name)}</div>
-            <div className="status-dot"></div>
-          </div>
-          {isOpen && (
-            <div className="user-meta">
-              <span className="name">{user?.name}</span>
-              <span className="role-tag">{user?.role}</span>
+        {/* Updates */}
+        <div className={`sidebar-item ${isActive('/updates') ? 'active' : ''}`} onClick={() => handleNavigation('/updates')}>
+          <Bell size={20} className="icon" />
+          {isOpen && <span>Updates</span>}
+        </div>
+
+        {/* --- ADMIN ONLY LINKS --- */}
+        {user?.role === 'admin' && (
+          <>
+            <div className={`sidebar-item ${isActive('/events') ? 'active' : ''}`} onClick={() => handleNavigation('/events')}>
+              <Calendar size={20} className="icon" />
+              {isOpen && <span>Manage Events</span>}
             </div>
-          )}
-        </div>
-
-        {/* Navigation Area */}
-        <nav className="sidebar-navigation">
-          {menuItems.map((group, idx) => (
-            <div key={idx} className="nav-group">
-              {isOpen && <p className="group-label">{group.section}</p>}
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link 
-                    key={item.path} 
-                    to={item.path} 
-                    className={`nav-link ${isActive ? "active" : ""}`}
-                    title={!isOpen ? item.label : ""}
-                  >
-                    <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                    {isOpen && <span>{item.label}</span>}
-                    {isActive && isOpen && <div className="active-indicator" />}
-                  </Link>
-                );
-              })}
+            <div className={`sidebar-item ${isActive('/registrations') ? 'active' : ''}`} onClick={() => handleNavigation('/registrations')}>
+              <Users size={20} className="icon" />
+              {isOpen && <span>Registrations</span>}
             </div>
-          ))}
-        </nav>
+            <div className={`sidebar-item ${isActive('/resources') ? 'active' : ''}`} onClick={() => handleNavigation('/resources')}>
+              <ClipboardList size={20} className="icon" />
+              {isOpen && <span>Resources</span>}
+            </div>
+          </>
+        )}
 
-        {/* Bottom Actions */}
-        <div className="sidebar-actions">
-          <Link to="/settings" className={`nav-link ${location.pathname === '/settings' ? 'active' : ''}`}>
-            <Settings size={20} />
-            {isOpen && <span>Settings</span>}
-          </Link>
-          <button className="logout-trigger" onClick={onLogout}>
-            <LogOut size={20} />
-            {isOpen && <span>Sign Out</span>}
-          </button>
+        {/* --- STUDENT ONLY LINKS --- */}
+        {user?.role === 'student' && (
+          <div className={`sidebar-item ${isActive('/events') ? 'active' : ''}`} onClick={() => handleNavigation('/events')}>
+            <Calendar size={20} className="icon" />
+            {isOpen && <span>My Classes</span>}
+          </div>
+        )}
+
+        {/* Settings */}
+        <div className={`sidebar-item ${isActive('/settings') ? 'active' : ''}`} onClick={() => handleNavigation('/settings')}>
+          <SettingsIcon size={20} className="icon" />
+          {isOpen && <span>Settings</span>}
         </div>
-      </aside>
+      </nav>
 
-      {isOpen && <div className="mobile-blur-overlay" onClick={toggleSidebar} />}
-    </>
+      {/* Sidebar Footer */}
+      <div className="sidebar-footer">
+        <div className="sidebar-item logout" onClick={onLogout}>
+          <LogOut size={20} className="icon" />
+          {isOpen && <span>Logout</span>}
+        </div>
+      </div>
+    </aside>
   );
 };
 

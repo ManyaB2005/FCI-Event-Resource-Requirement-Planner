@@ -24,6 +24,8 @@ const studentRoutes = require('./src/routes/studentRoutes');
 app.use('/api/auth', authRoutes); // This makes http://localhost:5000/api/auth/login work
 app.use('/api/events', eventRoutes);
 app.use('/api/student', studentRoutes);
+app.use('/api/updates', require('./src/routes/updateRoutes'));
+app.use('/api/registrations', require('./src/routes/registrationRoutes'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

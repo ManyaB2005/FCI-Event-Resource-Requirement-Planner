@@ -1,32 +1,29 @@
 const pool = require('../config/db');
-const nodemailer = require('nodemailer');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
+// 1. Fetch ALL available classes for the student to join
 exports.getAvailableClasses = async (req, res) => {
   try {
-    const query = `
-      SELECT c.class_id, c.name as class_name, c.date, c.time, c.venue, c.seat_limit,
-        f.name as folder_name, e.name as event_name, e.type as event_type,
-        (SELECT COUNT(*) FROM registrations r WHERE r.class_id = c.class_id) as current_enrollment
+    // LEFT JOIN ensures classes show even if folder/event links are missing
+    // We select c.name AS class_name to keep it consistent for the frontend
+    const [rows] = await pool.query(`
+      SELECT 
+        c.*, 
+        c.name AS class_name,
+        f.name AS folder_name, 
+        e.name AS event_name 
       FROM classes c
-      JOIN class_folders f ON c.folder_id = f.folder_id
-      JOIN events e ON f.event_id = e.event_id
+      LEFT JOIN class_folders f ON c.folder_id = f.folder_id
+      LEFT JOIN events e ON f.event_id = e.event_id
       ORDER BY c.date ASC
-    `;
-    const [classes] = await pool.query(query);
-    res.json(classes);
+    `);
+    res.json(rows);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch classes" });
+    console.error("Error fetching available classes:", error);
+    res.status(500).json({ message: "Error fetching classes" });
   }
 };
 
+// 2. Register for a Class
 exports.registerForClass = async (req, res) => {
   const { classId } = req.params;
   const userId = req.user.id;
@@ -34,6 +31,8 @@ exports.registerForClass = async (req, res) => {
 
   try {
     await connection.beginTransaction();
+    
+    // Check seat limits
     const [classData] = await connection.query(
       `SELECT seat_limit, (SELECT COUNT(*) FROM registrations WHERE class_id = ?) as current_count FROM classes WHERE class_id = ? FOR UPDATE`,
       [classId, classId]
@@ -46,7 +45,13 @@ exports.registerForClass = async (req, res) => {
       throw new Error("Class is fully booked");
     }
 
-    await connection.query('INSERT INTO registrations (class_id, user_id) VALUES (?, ?)', [classId, userId]);
+    // IMPORTANT: Check if your table uses 'user_id' or 'student_id'. 
+    // Based on your previous error, I am using 'user_id' to match your INSERT.
+    await connection.query(
+      'INSERT INTO registrations (class_id, user_id) VALUES (?, ?)', 
+      [classId, userId]
+    );
+    
     await connection.commit();
     res.status(201).json({ message: "Successfully registered!" });
   } catch (error) {
@@ -58,57 +63,67 @@ exports.registerForClass = async (req, res) => {
   }
 };
 
-exports.getNotifications = async (req, res) => {
-  try {
-    const [notifications] = await pool.query('SELECT * FROM notifications ORDER BY created_at DESC LIMIT 5');
-    res.json(notifications);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch notifications" });
-  }
-};
-
+// 3. Get my enrolled classes with full details
 exports.getMyRegistrations = async (req, res) => {
   const userId = req.user.id;
   try {
-    const query = `
-      SELECT c.class_id, c.name as class_name, c.date, c.venue, c.requires_ppt, r.presentation_link
+    // FIX: Changed 'WHERE student_id' to 'WHERE user_id' to match your registration logic
+    const [rows] = await pool.query(`
+      SELECT 
+        r.registration_id, 
+        r.presentation_link, 
+        c.class_id,
+        c.name AS class_name, 
+        c.date, 
+        c.time, 
+        c.venue, 
+        c.drive_link, 
+        c.requires_ppt
       FROM registrations r
-      JOIN classes c ON r.class_id = c.class_id
+      INNER JOIN classes c ON r.class_id = c.class_id
       WHERE r.user_id = ?
-      ORDER BY c.date ASC
-    `;
-    const [myClasses] = await pool.query(query, [userId]);
-    res.json(myClasses);
+    `, [userId]);
+    res.json(rows);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch registrations" });
+    console.error("Error fetching registrations:", error);
+    res.status(500).json({ message: "Error fetching registrations" });
   }
 };
 
-exports.submitPresentationEmail = async (req, res) => {
-  const { classId } = req.params;
-  const file = req.file;
-  const studentName = req.user.name || "A Student";
+// 4. Manual "Mark as Uploaded"
+exports.markAsUploaded = async (req, res) => {
+  const { registrationId } = req.params;
+  try {
+    await pool.query(
+      'UPDATE registrations SET presentation_link = "COMPLETED" WHERE registration_id = ?',
+      [registrationId]
+    );
+    res.json({ message: "Marked as uploaded" });
+  } catch (error) {
+    console.error("Upload status error:", error);
+    res.status(500).json({ message: "Failed to update status" });
+  }
+};
 
-  if (!file) return res.status(400).json({ message: "No file uploaded." });
+// 5. Submit Presentation Link (kept for backward compatibility)
+exports.submitPresentationLink = async (req, res) => {
+  const classId = req.params.id; 
+  const { presentation_link } = req.body;
+  const userId = req.user.id;
 
   try {
-    const [classData] = await pool.query('SELECT name FROM classes WHERE class_id = ?', [classId]);
-    const className = classData.length > 0 ? classData[0].name : "Unknown Class";
+    const [result] = await pool.query(
+      'UPDATE registrations SET presentation_link = ? WHERE class_id = ? AND user_id = ?',
+      [presentation_link, classId, userId]
+    );
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_RECEIVER,
-      subject: `New Presentation: ${className} - ${studentName}`,
-      text: `${studentName} has submitted their presentation for: ${className}.\n\nFind the file attached.`,
-      attachments: [{ filename: file.originalname, content: file.buffer }]
-    };
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Registration not found." });
+    }
 
-    await transporter.sendMail(mailOptions);
-    await pool.query('UPDATE registrations SET presentation_link = ? WHERE class_id = ? AND user_id = ?', [file.originalname, classId, req.user.id]);
-
-    res.json({ message: "Presentation emailed to the trainer!" });
+    res.status(200).json({ message: "Link saved successfully." });
   } catch (error) {
-    console.error("Email Error:", error);
-    res.status(500).json({ message: "Failed to send email." });
+    console.error("Error submitting link:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

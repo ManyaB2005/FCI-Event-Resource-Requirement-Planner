@@ -3,76 +3,95 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 exports.register = async (req, res) => {
-  const { name, email, password, role } = req.body;
-
+  const { name, email, password, role, batch } = req.body;
   try {
-    // 1. Check if user already exists
-    const [existingUsers] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-    if (existingUsers.length > 0) {
-      return res.status(400).json({ message: "An account with this email already exists." });
-    }
-
-    // 2. Hash the password securely
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // 3. Insert new user (default is_active to TRUE for now)
+    const hashedPassword = await bcrypt.hash(password, 10);
     await pool.query(
-      'INSERT INTO users (name, email, password_hash, role, is_active) VALUES (?, ?, ?, ?, TRUE)',
-      [name, email, hashedPassword, role || 'student']
+      'INSERT INTO users (name, email, password_hash, role, batch) VALUES (?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, role || 'student', batch || null]
     );
-
-    res.status(201).json({ message: "Account created successfully! You can now log in." });
+    res.status(201).json({ message: "User created" });
   } catch (error) {
-    console.error("Registration Error:", error);
-    res.status(500).json({ message: "Server error during registration." });
+    res.status(500).json({ error: error.message });
   }
 };
 
+// 2. LOGIN (Updated to send 'batch' to the frontend)
 exports.login = async (req, res) => {
-  const { email, password, role } = req.body;
+  const { email, password } = req.body;
+  if (!password) return res.status(400).json({ message: "Please provide a password." });
 
   try {
-    // 1. Find the user by email
-    const [users] = await pool.query('SELECT * FROM users WHERE email = ? AND is_active = TRUE', [email]);
-    
-    if (users.length === 0) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
+    const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    if (rows.length === 0) return res.status(404).json({ message: "User not found" });
 
-    const user = users[0];
+    const user = rows[0];
+    if (!user.password_hash) return res.status(500).json({ message: "Password missing in DB." });
 
-    // 2. Verify the role matches what they selected on the frontend UI
-    if (user.role !== role) {
-      return res.status(403).json({ message: "Selected role does not match your account" });
-    }
-
-    // 3. Compare the entered password with the hashed password in the database
     const isMatch = await bcrypt.compare(password, user.password_hash);
-    
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
+    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
-    // 4. Generate a JWT token
+    const actualUserId = user.user_id || user.id;
+
+    // ADDED 'batch' to the token
     const token = jwt.sign(
-      { id: user.user_id, role: user.role },
+      { id: actualUserId, role: user.role, name: user.name, email: user.email, batch: user.batch },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" } // Token expires in 1 day
+      { expiresIn: '1d' }
     );
 
-    // 5. Send back the token and user data (excluding the password!)
-    res.json({
-      token,
-      user: {
-        user_id: user.user_id,
-        name: user.name,
-        role: user.role
-      }
+    // ADDED 'batch' to the user response object
+    res.json({ 
+      token, 
+      user: { 
+        id: actualUserId, 
+        name: user.name, 
+        role: user.role, 
+        email: user.email, 
+        batch: user.batch 
+      } 
     });
-
   } catch (error) {
-    console.error("Login Error:", error);
-    res.status(500).json({ message: "Server error occurred during login" });
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateProfile = async (req, res) => {
+  const { name, email } = req.body;
+  const userId = req.user.id; 
+  try {
+    // Note: If your primary key is user_id instead of id, change 'id = ?' to 'user_id = ?' below
+    await pool.query('UPDATE users SET name = ?, email = ? WHERE id = ? OR user_id = ?', [name, email, userId, userId]);
+    res.json({ message: "Profile updated successfully!" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update profile." });
+  }
+};
+exports.changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user.id;
+
+  try {
+    const [rows] = await pool.query('SELECT password_hash FROM users WHERE id = ? OR user_id = ?', [userId, userId]);
+    if (rows.length === 0) return res.status(404).json({ message: "User not found" });
+
+    const isMatch = await bcrypt.compare(currentPassword, rows[0].password_hash);
+    if (!isMatch) return res.status(401).json({ message: "Incorrect current password" });
+
+    const hashedNew = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password_hash = ? WHERE id = ? OR user_id = ?', [hashedNew, userId, userId]);
+    
+    res.json({ message: "Password updated successfully!" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update password." });
+  }
+};
+exports.deleteAccount = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    await pool.query('DELETE FROM users WHERE id = ? OR user_id = ?', [userId, userId]);
+    res.json({ message: "Account deleted successfully." });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete account." });
   }
 };

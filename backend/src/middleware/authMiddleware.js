@@ -1,21 +1,20 @@
 const jwt = require('jsonwebtoken');
 
+// Ensure you are exporting it as an object property
 const verifyToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
+  const token = req.headers['authorization']?.split(' ')[1];
 
-  if (!authHeader) {
-    return res.status(401).json({ message: "Access Denied: No token provided" });
+  if (!token) {
+    return res.status(403).json({ message: "No token provided" });
   }
 
-  const token = authHeader.split(" ")[1]; // Format is "Bearer <token>"
-
   try {
-    const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified; // Attach user info (id, role) to the request
-    next(); // Pass control to the next function (the controller)
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
   } catch (err) {
-    res.status(401).json({ message: "Invalid or Expired Token" });
+    return res.status(401).json({ message: "Unauthorized" });
   }
 };
 
-module.exports = verifyToken;
+module.exports = { verifyToken }; // <-- Check this line!

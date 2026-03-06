@@ -7,7 +7,9 @@ import Dashboard from "./components/Dashboard";
 import StudentView from "./components/StudentView";
 import EventManagement from "./components/EventManagement"; 
 import ResourceRequirements from "./components/ResourceRequirements";
-import AdminRegistrations from "./components/AdminRegistrations"; // <-- Ensure this file exists in /components
+import AdminRegistrations from "./components/AdminRegistrations";
+import Settings from "./components/Settings"; 
+import Updates from "./components/Updates"; // <-- Updates Import
 
 import "./App.css";
 
@@ -58,10 +60,16 @@ function App() {
         <main className={`main-viewport ${sidebarOpen ? "sidebar-expanded" : "sidebar-collapsed"}`}>
           <div className="content-wrapper">
             <Routes>
-              {/* Common Route */}
+              {/* Common Routes */}
               <Route path="/" element={<Dashboard user={user} />} />
+              
+              {/* FIXED: Passing 'user' prop to Settings so it can display profile info */}
+              <Route path="/settings" element={<Settings user={user} />} /> 
+              
+              {/* ADDED: Updates Route so the Notification Center actually loads */}
+              <Route path="/updates" element={<Updates user={user} />} />
 
-              {/* Admin Access Only - Consolidated */}
+              {/* Admin Access Only */}
               {user.role === "admin" && (
                 <>
                   <Route path="/events" element={<EventManagement user={user} />} />
@@ -75,7 +83,7 @@ function App() {
                 <Route path="/events" element={<StudentView user={user} />} />
               )}
 
-              {/* Catch-all */}
+              {/* Catch-all: Automatically redirects to the Dashboard instead of Events */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
