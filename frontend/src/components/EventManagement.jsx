@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { CheckSquare, Edit3, Plus, CheckCircle, Circle, ExternalLink } from "lucide-react";
+import { 
+  CheckSquare, Edit3, Plus, CheckCircle, Circle, ExternalLink, 
+  Trash2, Folder, Calendar, MapPin, Video, Save, X, ChevronDown, ChevronUp
+} from "lucide-react";
 import { fetchWithAuth } from "../api";
 import "./EventManagement.css";
 
@@ -8,6 +11,7 @@ const EventManagement = ({ user }) => {
   const [loading, setLoading] = useState(true);
   
   const [activeEventId, setActiveEventId] = useState(null);
+  const [viewingFolderId, setViewingFolderId] = useState(null); 
   const [activeFolderId, setActiveFolderId] = useState(null);
   const [editingClassId, setEditingClassId] = useState(null);
   const [editingEventId, setEditingEventId] = useState(null);
@@ -16,17 +20,18 @@ const EventManagement = ({ user }) => {
   
   const [logisticsMode, setLogisticsMode] = useState("checklist");
   const [activeLogisticsClassId, setActiveLogisticsClassId] = useState(null);
+  const [activeClassResources, setActiveClassResources] = useState([]); 
   const [newItemName, setNewItemName] = useState("");
 
-  const [editEventForm, setEditEventForm] = useState({ name: "" }); // Removed 'type'
+  const [editEventForm, setEditEventForm] = useState({ name: "" });
   const [newEventName, setNewEventName] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
-  const [newFolderBatch, setNewFolderBatch] = useState(""); // Added state for Batch
+  const [newFolderBatch, setNewFolderBatch] = useState(""); 
   
+  // REMOVED: seat_limit from initial state
   const [classForm, setClassForm] = useState({ 
-    name: "", date: "", time: "", venue: "", seat_limit: 0, requires_ppt: false, drive_link: "" 
+    name: "", date: "", time: "", venue: "", requires_ppt: false, drive_link: "", class_type: "offline" 
   });
-  const [classResources, setClassResources] = useState([]);
 
   useEffect(() => { loadEvents(); }, []);
 
@@ -41,17 +46,14 @@ const EventManagement = ({ user }) => {
   const handleCreateEvent = async () => {
     if (!newEventName.trim()) return;
     try {
-      await fetchWithAuth("/events", { 
-        method: "POST", 
-        body: JSON.stringify({ name: newEventName }) // Removed 'type'
-      });
+      await fetchWithAuth("/events", { method: "POST", body: JSON.stringify({ name: newEventName }) });
       setNewEventName(""); loadEvents();
     } catch (err) { alert(err.message); }
   };
 
   const startEditEvent = (event) => {
     setEditingEventId(event.event_id);
-    setEditEventForm({ name: event.name }); // Removed 'type'
+    setEditEventForm({ name: event.name });
   };
 
   const handleUpdateEvent = async (eventId) => {
@@ -73,14 +75,12 @@ const EventManagement = ({ user }) => {
     if (!newFolderName.trim()) return;
     try {
       await fetchWithAuth(`/events/${eventId}/folders`, { 
-        method: "POST", 
-        body: JSON.stringify({ name: newFolderName, batch: newFolderBatch }) // Added 'batch'
+        method: "POST", body: JSON.stringify({ name: newFolderName, batch: newFolderBatch }) 
       });
       setNewFolderName(""); setNewFolderBatch(""); loadEvents();
     } catch (err) { alert(err.message); }
   };
 
-  // ADDED: Delete Folder Function
   const handleDeleteFolder = async (folderId) => {
     if (!window.confirm("Delete this Sub-Event/Folder? All classes inside will be lost.")) return;
     try {
@@ -91,13 +91,13 @@ const EventManagement = ({ user }) => {
   const handleSaveClass = async (folderId) => {
     if (!classForm.name.trim()) return alert("Class name is required");
     try {
-      const payload = { ...classForm, resources: classResources };
       if (editingClassId) {
-        await fetchWithAuth(`/events/classes/${editingClassId}`, { method: "PUT", body: JSON.stringify(payload) });
+        await fetchWithAuth(`/events/classes/${editingClassId}`, { method: "PUT", body: JSON.stringify(classForm) });
       } else {
-        await fetchWithAuth(`/events/folders/${folderId}/classes`, { method: "POST", body: JSON.stringify(payload) });
+        await fetchWithAuth(`/events/folders/${folderId}/classes`, { method: "POST", body: JSON.stringify(classForm) });
       }
-      resetClassForm(); loadEvents();
+      resetClassForm(true); 
+      loadEvents();
     } catch (err) { alert(err.message); }
   };
 
@@ -111,233 +111,276 @@ const EventManagement = ({ user }) => {
   const handleEditClick = (cls) => {
     setEditingClassId(cls.class_id);
     setActiveFolderId(cls.folder_id);
+    setViewingFolderId(cls.folder_id); 
     setIsClassFormOpen(true);
+    // REMOVED: seat_limit from edit mapping
     setClassForm({
-      name: cls.name, 
-      date: cls.date ? cls.date.split('T')[0] : "",
-      time: cls.time || "", 
-      venue: cls.venue || "", 
-      seat_limit: cls.seat_limit || 0,
+      name: cls.name, date: cls.date ? cls.date.split('T')[0] : "", time: cls.time || "", 
+      venue: cls.venue || "",
       requires_ppt: cls.requires_ppt === 1 || cls.requires_ppt === true,
-      drive_link: cls.drive_link || "" 
+      drive_link: cls.drive_link || "", class_type: cls.class_type || "offline"
     });
-    setClassResources(cls.resources || []); 
+    
+    setTimeout(() => {
+      document.getElementById(`form-area-${cls.folder_id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
-  const resetClassForm = () => {
+  const resetClassForm = (closeForm = true) => {
     setEditingClassId(null);
-    setIsClassFormOpen(false);
-    setClassForm({ name: "", date: "", time: "", venue: "", seat_limit: 0, requires_ppt: false, drive_link: "" });
-    setClassResources([]);
+    if (closeForm === true) {
+      setIsClassFormOpen(false);
+    }
+    // REMOVED: seat_limit from reset
+    setClassForm({ name: "", date: "", time: "", venue: "", requires_ppt: false, drive_link: "", class_type: "offline" });
+  };
+
+  const handleLogisticsClick = async (classId) => {
+    if (activeLogisticsClassId === classId) {
+      setActiveLogisticsClassId(null);
+      setActiveClassResources([]);
+    } else {
+      setActiveLogisticsClassId(classId);
+      setLogisticsMode("checklist");
+      try {
+        const res = await fetchWithAuth(`/resources/class/${classId}?t=${new Date().getTime()}`);
+        setActiveClassResources(Array.isArray(res) ? res : []);
+      } catch (err) {
+        setActiveClassResources([]);
+      }
+    }
   };
 
   const handleToggleResourceStatus = async (resourceId, currentStatus) => {
     if (logisticsMode !== 'checklist') return; 
-    const newStatus = currentStatus === "confirmed" ? "planned" : "confirmed";
+    const newStatus = currentStatus === 'confirmed' ? 'planned' : 'confirmed';
+    setActiveClassResources(prev => prev.map(res => res.resource_id === resourceId ? { ...res, status: newStatus } : res));
     try {
-      await fetchWithAuth(`/events/resources/${resourceId}/status`, { method: "PUT", body: JSON.stringify({ status: newStatus }) });
-      loadEvents(); 
-    } catch (err) { alert("Failed to update status."); }
+      await fetchWithAuth(`/resources/${resourceId}/status`, { method: "PUT", body: JSON.stringify({ status: newStatus }) });
+    } catch (err) { alert("Failed to update status. Please refresh."); }
   };
 
   const handleAddInlineResource = async (classId) => {
     if (!newItemName.trim()) return;
     try {
-      await fetchWithAuth(`/events/classes/${classId}/resources`, { 
-        method: "POST", 
-        body: JSON.stringify({ name: newItemName, quantity: 1 }) 
+      const response = await fetchWithAuth(`/resources/class/${classId}`, { 
+        method: "POST", body: JSON.stringify({ name: newItemName, quantity: 1, unit: "pieces" }) 
       });
-      setNewItemName(""); loadEvents();
+      const newResource = { resource_id: response.resource_id, class_id: classId, name: newItemName, quantity: 1, unit: "pieces", status: "planned" };
+      setActiveClassResources(prev => [...prev, newResource]);
+      setNewItemName(""); 
     } catch (err) { alert(err.message); }
   };
 
-  if (loading) return <div style={{ padding: "40px", textAlign: "center", color: "#4f46e5" }}>Loading Event Data...</div>;
+  if (loading) return <div style={{ padding: "50px", textAlign: "center", color: "#4f46e5", fontSize: "1.2rem", fontWeight: "bold" }}>Loading Dashboard...</div>;
 
   return (
-    <div style={{ padding: "30px", maxWidth: "1200px", margin: "0 auto" }}>
-      <h2 style={{ marginBottom: "20px" }}>Event Management</h2>
+    <div style={{ padding: "30px", maxWidth: "1200px", margin: "0 auto", fontFamily: "'Inter', sans-serif" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" }}>
+        <h2 style={{ color: "#1e293b", margin: 0 }}>Event Management</h2>
+      </div>
 
       {user.role === "admin" && (
-        <div className="form-card" style={{ background: "white", padding: "20px", borderRadius: "12px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", marginBottom: "30px" }}>
-          <h3>Create New Event</h3>
-          <div style={{ display: "flex", gap: "10px", marginTop: "10px", flexWrap: "wrap" }}>
-            <input placeholder="Enter Event Name (e.g. FY25 Training)" value={newEventName} onChange={(e) => setNewEventName(e.target.value)} className="input-style" style={{ flex: 1, minWidth: "250px" }} />
-            <button onClick={handleCreateEvent} className="btn-primary" style={{ minWidth: "120px" }}>Create Event</button>
+        <div style={{ background: "white", padding: "24px", borderRadius: "16px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", marginBottom: "35px" }}>
+          <h3 style={{ margin: "0 0 15px 0", color: "#334155", fontSize: "1.1rem" }}>Create New Event</h3>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <input 
+              placeholder="Enter  Event Name (e.g. Training)" 
+              value={newEventName} 
+              onChange={(e) => setNewEventName(e.target.value)} 
+              style={{ flex: 1, minWidth: "250px", padding: "12px 16px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "1rem", outline: "none" }} 
+            />
+            <button 
+              onClick={handleCreateEvent} 
+              style={{ display: "flex", alignItems: "center", gap: "8px", background: "#4f46e5", color: "white", padding: "0 24px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "600", transition: "0.2s" }}
+            >
+              <Plus size={18} /> Create Event
+            </button>
           </div>
         </div>
       )}
 
-      {events.map((event) => (
-        <div key={event.event_id} className="event-card" style={{ background: "white", padding: "20px", borderRadius: "16px", marginBottom: "20px", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            
-            {editingEventId === event.event_id ? (
-              <div style={{ display: "flex", gap: "10px", flex: 1, marginRight: "15px", flexWrap: "wrap", alignItems: "center" }}>
-                <input value={editEventForm.name} onChange={(e) => setEditEventForm({...editEventForm, name: e.target.value})} className="input-style" style={{ marginBottom: 0, flex: 1 }} />
-                <button onClick={() => handleUpdateEvent(event.event_id)} className="btn-primary" style={{ background: "#48bb78" }}>Save</button>
-                <button onClick={() => setEditingEventId(null)} className="btn-primary" style={{ background: "#a0aec0" }}>Cancel</button>
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: "15px", flex: 1 }}>
-                <div>
-                  <h3 style={{ margin: 0 }}>{event.name}</h3>
-                </div>
-                
-                <div style={{ display: "flex", gap: "8px", alignSelf: "flex-start", marginTop: "5px" }}>
-                  <button onClick={() => startEditEvent(event)} style={{ background: "none", border: "none", color: "#667eea", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>Edit</button>
-                  <button onClick={() => handleDeleteEvent(event.event_id)} style={{ background: "none", border: "none", color: "#e53e3e", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>Delete</button>
-                </div>
-              </div>
-            )}
-
-            <button className="btn-primary" onClick={() => setActiveEventId(activeEventId === event.event_id ? null : event.event_id)} style={{ alignSelf: "flex-start" }}>
-              {activeEventId === event.event_id ? "Close Folders" : "Manage Folders"}
-            </button>
-          </div>
-
-          {activeEventId === event.event_id && (
-            <div style={{ marginTop: "20px", padding: "20px", background: "#f8f9fa", borderRadius: "12px" }}>
-              <div style={{ display: "flex", gap: "10px", marginBottom: "25px", flexWrap: "wrap" }}>
-                <input placeholder="New Sub-Event/Folder Name" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} className="input-style" style={{ marginBottom: 0, flex: 1, minWidth: "200px" }} />
-                <input placeholder="Batch (Optional)" value={newFolderBatch} onChange={(e) => setNewFolderBatch(e.target.value)} className="input-style" style={{ marginBottom: 0, flex: 1, minWidth: "150px" }} />
-                <button onClick={() => handleCreateFolder(event.event_id)} className="btn-primary" style={{ background: "#4a5568" }}>Add Folder</button>
-              </div>
-
-              {event.folders?.map((folder) => (
-                <div key={folder.folder_id} style={{ padding: "20px", background: "white", borderRadius: "12px", marginBottom: "15px", border: "1px solid #e2e8f0" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", flexWrap: "wrap", gap: "10px" }}>
-                    
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <h4 style={{ color: "#2d3748", margin: 0 }}>📁 {folder.name}</h4>
-                      {folder.batch && (
-                        <span style={{ fontSize: "13px", background: "#edf2f7", padding: "4px 8px", borderRadius: "4px", color: "#4a5568", fontWeight: "600" }}>
-                          Batch: {folder.batch}
-                        </span>
-                      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "25px", alignItems: "start" }}>
+        {events.map((event) => {
+          const isActive = activeEventId === event.event_id;
+          return (
+            <div 
+              key={event.event_id} 
+              style={{ 
+                background: "white", padding: "24px", borderRadius: "16px", 
+                gridColumn: isActive ? "1 / -1" : "auto",
+                border: isActive ? "2px solid #4f46e5" : "1px solid #e2e8f0", 
+                boxShadow: isActive ? "0 20px 25px -5px rgba(0,0,0,0.1)" : "0 10px 15px -3px rgba(0,0,0,0.05)",
+                transition: "all 0.3s ease"
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: isActive ? "row" : "column", justifyContent: "space-between", alignItems: isActive ? "center" : "stretch", gap: "20px", paddingBottom: isActive ? "20px" : "0", borderBottom: isActive ? "1px solid #f1f5f9" : "none" }}>
+                {editingEventId === event.event_id ? (
+                  <div style={{ display: "flex", flexDirection: isActive ? "row" : "column", gap: "10px", flex: 1, flexWrap: "wrap", alignItems: "center" }}>
+                    <input 
+                      value={editEventForm.name} 
+                      onChange={(e) => setEditEventForm({...editEventForm, name: e.target.value})} 
+                      style={{ flex: 1, padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "1rem", minWidth: "150px", textAlign: isActive ? "left" : "center", width: isActive ? "auto" : "100%", boxSizing: "border-box" }} 
+                    />
+                    <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                      <button onClick={() => handleUpdateEvent(event.event_id)} style={{ display: "flex", alignItems: "center", gap: "5px", background: "#10b981", color: "white", padding: "10px 16px", borderRadius: "6px", border: "none", cursor: "pointer", fontWeight: "bold" }}><Save size={16} /> Save</button>
+                      <button onClick={() => setEditingEventId(null)} style={{ display: "flex", alignItems: "center", gap: "5px", background: "#f1f5f9", color: "#475569", padding: "10px 16px", borderRadius: "6px", border: "none", cursor: "pointer", fontWeight: "bold" }}><X size={16} /> Cancel</button>
                     </div>
-
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                      {/* ADDED FOLDER DELETE BUTTON HERE */}
-                      <button 
-                        onClick={() => handleDeleteFolder(folder.folder_id)} 
-                        style={{ background: "none", border: "none", color: "#e53e3e", cursor: "pointer", fontSize: "13px", fontWeight: "600", padding: "6px" }}
-                      >
-                        Delete Folder
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: isActive ? "row" : "column", justifyContent: isActive ? "space-between" : "center", alignItems: "center", gap: "15px", flexWrap: "wrap", flex: 1 }}>
+                    <h3 style={{ margin: 0, color: "#1e293b", fontSize: "1.4rem", wordBreak: "break-word", textAlign: isActive ? "left" : "center" }}>{event.name}</h3>
+                    <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                      <button onClick={(e) => { e.stopPropagation(); startEditEvent(event); }} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", color: "#64748b", padding: "8px 14px", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "5px" }}>
+                        <Edit3 size={14} /> Edit
                       </button>
-
-                      <button 
-                        onClick={() => { setActiveFolderId(folder.folder_id); setIsClassFormOpen(!isClassFormOpen); if(isClassFormOpen) resetClassForm(); }} 
-                        style={{ background: "#ebf4ff", padding: "6px 12px", borderRadius: "6px", border: "none", color: "#2563eb", cursor: "pointer", fontWeight: "600" }}
-                      >
-                        {activeFolderId === folder.folder_id && isClassFormOpen ? "Close Form" : "+ Add Class"}
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.event_id); }} style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#ef4444", padding: "8px 14px", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "5px" }}>
+                        <Trash2 size={14} /> Delete
                       </button>
                     </div>
                   </div>
+                )}
+                <button 
+                  onClick={() => setActiveEventId(isActive ? null : event.event_id)} 
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", background: isActive ? "#f1f5f9" : "#4f46e5", color: isActive ? "#475569" : "white", padding: "12px 20px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "bold", transition: "all 0.2s", width: isActive ? "auto" : "100%" }}
+                >
+                  {isActive ? <><ChevronUp size={18}/> Close Folders</> : <><Folder size={18}/> Manage Folders</>}
+                </button>
+              </div>
 
-                  {activeFolderId === folder.folder_id && isClassFormOpen && (
-                    <div style={{ padding: "20px", background: "#f8fafc", borderRadius: "8px", marginBottom: "20px", border: "1px solid #e2e8f0" }}>
-                      <h4>{editingClassId ? "Edit Class" : "New Class"}</h4>
-                      
-                      <div style={{ display: "grid", gap: "15px", gridTemplateColumns: "1fr 1fr" }}>
-                        <input placeholder="Class Name (e.g. Day 1)" value={classForm.name} onChange={(e) => setClassForm({...classForm, name: e.target.value})} className="input-style" />
-                        <input placeholder="Venue" value={classForm.venue} onChange={(e) => setClassForm({...classForm, venue: e.target.value})} className="input-style" />
-                        <input type="date" value={classForm.date} onChange={(e) => setClassForm({...classForm, date: e.target.value})} className="input-style" />
-                        <input type="time" value={classForm.time} onChange={(e) => setClassForm({...classForm, time: e.target.value})} className="input-style" />
-                        <input type="number" placeholder="Seats" value={classForm.seat_limit} onChange={(e) => setClassForm({...classForm, seat_limit: parseInt(e.target.value)})} className="input-style" />
-                        
-                        <input 
-                          type="url" 
-                          placeholder="Drive Upload Link (Optional)" 
-                          value={classForm.drive_link} 
-                          onChange={(e) => setClassForm({...classForm, drive_link: e.target.value})} 
-                          className="input-style" 
-                        />
+              {isActive && (
+                <div style={{ marginTop: "25px", padding: "24px", background: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                  <div style={{ display: "flex", gap: "12px", marginBottom: "30px", flexWrap: "wrap", background: "white", padding: "16px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)", border: "1px solid #e2e8f0" }}>
+                    <input placeholder="New Folder/Sub-Event Name" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} style={{ flex: 2, minWidth: "200px", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", outline: "none" }} />
+                    <input placeholder="Batch" value={newFolderBatch} onChange={(e) => setNewFolderBatch(e.target.value)} style={{ flex: 1, minWidth: "150px", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", outline: "none" }} />
+                    <button onClick={() => handleCreateFolder(event.event_id)} style={{ display: "flex", alignItems: "center", gap: "6px", background: "#334155", color: "white", padding: "10px 20px", borderRadius: "6px", border: "none", cursor: "pointer", fontWeight: "bold" }}>
+                      <Plus size={16} /> Add Folder
+                    </button>
+                  </div>
 
-                        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", gridColumn: "span 2" }}>
-                          <input type="checkbox" checked={classForm.requires_ppt} onChange={(e) => setClassForm({...classForm, requires_ppt: e.target.checked})} />
-                          Require Student PPT
-                        </label>
-                      </div>
+                  {event.folders?.map((folder) => {
+                    const isViewingFolder = viewingFolderId === folder.folder_id;
+                    return (
+                      <div key={folder.folder_id} style={{ background: "white", borderRadius: "12px", marginBottom: "20px", border: "1px solid #cbd5e1", overflow: "hidden", transition: "all 0.3s ease" }}>
+                        <div 
+                          onClick={() => setViewingFolderId(isViewingFolder ? null : folder.folder_id)}
+                          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", background: isViewingFolder ? "#e2e8f0" : "#f8fafc", borderBottom: isViewingFolder ? "1px solid #cbd5e1" : "none", flexWrap: "wrap", gap: "10px", cursor: "pointer", transition: "0.2s" }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <div style={{ color: "#64748b" }}>{isViewingFolder ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</div>
+                            <Folder color="#4f46e5" fill={isViewingFolder ? "white" : "#eef2ff"} size={24} />
+                            <h4 style={{ color: "#1e293b", margin: 0, fontSize: "1.1rem" }}>{folder.name}</h4>
+                            {folder.batch && <span style={{ fontSize: "12px", background: "white", padding: "4px 10px", borderRadius: "20px", color: "#475569", fontWeight: "bold", border: "1px solid #cbd5e1" }}>Batch: {folder.batch}</span>}
+                          </div>
+                          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.folder_id); }} style={{ background: "white", border: "1px solid #fecaca", color: "#ef4444", padding: "8px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600", display: "flex", alignItems: "center", gap: "5px" }}><Trash2 size={14} /> Delete</button>
+                            <button onClick={(e) => { e.stopPropagation(); setViewingFolderId(folder.folder_id); setActiveFolderId(folder.folder_id); resetClassForm(false); setIsClassFormOpen(true); }} style={{ display: "flex", alignItems: "center", gap: "6px", background: activeFolderId === folder.folder_id && isClassFormOpen ? "#334155" : "#eef2ff", color: activeFolderId === folder.folder_id && isClassFormOpen ? "white" : "#4f46e5", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}><Plus size={16}/> Add Class</button>
+                          </div>
+                        </div>
 
-                      <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-                        <button onClick={() => handleSaveClass(folder.folder_id)} className="btn-primary" style={{ flex: 1 }}>Save</button>
-                        <button onClick={resetClassForm} className="btn-primary" style={{ flex: 1, background: "white", color: "#4a5568", border: "1px solid #cbd5e0" }}>Cancel</button>
-                      </div>
-                    </div>
-                  )}
+                        {isViewingFolder && (
+                          <div style={{ animation: "fadeIn 0.3s ease-in-out" }}>
+                            <div id={`form-area-${folder.folder_id}`}>
+                              {activeFolderId === folder.folder_id && isClassFormOpen && (
+                                <div style={{ padding: "24px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                                  <h4 style={{ margin: "0 0 15px 0", color: "#334155", display: "flex", alignItems: "center", gap: "8px" }}>
+                                    {editingClassId ? <Edit3 size={18} color="#4f46e5"/> : <Plus size={18} color="#4f46e5"/>} {editingClassId ? "Edit Class Details" : "Configure New Class"}
+                                  </h4>
+                                  <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "1fr 1fr" }}>
+                                    <input placeholder="Class Name" value={classForm.name} onChange={(e) => setClassForm({...classForm, name: e.target.value})} style={formInputStyle} />
+                                    <div style={{ display: "flex", gap: "10px" }}>
+                                      <select value={classForm.class_type} onChange={(e) => setClassForm({...classForm, class_type: e.target.value})} style={{ ...formInputStyle, flex: "0 0 140px", cursor: "pointer", background: "white" }}>
+                                        <option value="offline">Offline</option>
+                                        <option value="online">Online</option>
+                                      </select>
+                                      <input placeholder={classForm.class_type === 'online' ? "Meeting Link" : "Venue"} value={classForm.venue} onChange={(e) => setClassForm({...classForm, venue: e.target.value})} style={{ ...formInputStyle, flex: 1 }} />
+                                    </div>
+                                    <input type="date" value={classForm.date} onChange={(e) => setClassForm({...classForm, date: e.target.value})} style={formInputStyle} />
+                                    <input type="time" value={classForm.time} onChange={(e) => setClassForm({...classForm, time: e.target.value})} style={formInputStyle} />
+                                    
+                                    {/* REMOVED: Seat Limit Input was here */}
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    {folder.classes?.map((cls) => {
-                      const classRes = cls.resources || [];
-                      const isLogisticsOpen = activeLogisticsClassId === cls.class_id;
-                      return (
-                        <div key={cls.class_id} style={{ padding: "15px", background: "#f8f9fa", borderRadius: "8px", borderLeft: "4px solid #667eea" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px" }}>
-                            <div>
-                              <strong style={{ display: "block", color: "#1e293b", fontSize: "15px" }}>{cls.name}</strong>
-                              <span style={{ fontSize: "13px", color: "#718096", display: "block", marginTop: "2px" }}>
-                                {cls.venue} | {cls.date?.split('T')[0]} {cls.time && `| ${cls.time}`}
-                              </span>
-                              
-                              {cls.drive_link && (
-                                <a href={cls.drive_link} target="_blank" rel="noopener noreferrer" style={{ fontSize: "12px", color: "#4f46e5", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", marginTop: "6px", fontWeight: "600" }}>
-                                  <ExternalLink size={12} /> Drive Folder Attached
-                                </a>
+                                    <input type="url" placeholder="Drive Upload Link (Optional)" value={classForm.drive_link} onChange={(e) => setClassForm({...classForm, drive_link: e.target.value})} style={{ ...formInputStyle, gridColumn: "span 2" }} />
+                                    <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", gridColumn: "span 2", background: "white", padding: "12px", borderRadius: "8px", border: "1px dashed #cbd5e1", cursor: "pointer" }}>
+                                      <input type="checkbox" checked={classForm.requires_ppt} onChange={(e) => setClassForm({...classForm, requires_ppt: e.target.checked})} style={{ width: "16px", height: "16px" }} />
+                                      <strong>Require Students to Upload Presentation</strong>
+                                    </label>
+                                  </div>
+                                  <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
+                                    <button onClick={() => handleSaveClass(folder.folder_id)} style={{ flex: 1, background: "#10b981", color: "white", padding: "12px", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}><Save size={18} /> Save Class</button>
+                                    <button onClick={() => resetClassForm(true)} style={{ flex: 1, background: "white", color: "#475569", border: "1px solid #cbd5e1", padding: "12px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}>Cancel</button>
+                                  </div>
+                                </div>
                               )}
                             </div>
-                            
-                            <div style={{ display: "flex", gap: "10px" }}>
-                              <button onClick={() => setActiveLogisticsClassId(isLogisticsOpen ? null : cls.class_id)} style={{ padding: "6px 12px", background: isLogisticsOpen ? "#2563eb" : "#edf2f7", color: isLogisticsOpen ? "white" : "#2d3748", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>Logistics</button>
-                              <button onClick={() => handleEditClick(cls)} className="btn-edit-small" style={{ fontSize: "13px" }}>Edit</button>
-                              <button onClick={() => handleDeleteClass(cls.class_id)} className="btn-delete-small" style={{ fontSize: "13px", background: "none", border: "none", color: "#e53e3e", cursor: "pointer", fontWeight: "600" }}>Delete</button>
-                            </div>
-                          </div>
 
-                          {isLogisticsOpen && (
-                            <div style={{ marginTop: "15px", paddingTop: "15px", borderTop: "1px dashed #cbd5e1" }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px" }}>
-                                <h5 style={{ margin: 0, fontSize: "14px" }}>Requirements Checklist</h5>
-                                <div style={{ display: "flex", background: "#e2e8f0", padding: "4px", borderRadius: "6px" }}>
-                                  <button onClick={() => setLogisticsMode("checklist")} style={{ ...toggleBtnStyle, background: logisticsMode === "checklist" ? "white" : "transparent" }}><CheckSquare size={14} /> Checklist</button>
-                                  <button onClick={() => setLogisticsMode("planning")} style={{ ...toggleBtnStyle, background: logisticsMode === "planning" ? "white" : "transparent" }}><Edit3 size={14} /> Plan</button>
-                                </div>
-                              </div>
-
-                              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                {classRes.map(req => (
-                                  <div key={req.resource_id} onClick={() => handleToggleResourceStatus(req.resource_id, req.status)} style={{ display: "flex", alignItems: "center", padding: "10px", background: req.status === "confirmed" ? "#f0fdf4" : "white", border: "1px solid #cbd5e1", borderRadius: "6px", cursor: logisticsMode === "checklist" ? "pointer" : "default" }}>
-                                    {logisticsMode === "checklist" && (
-                                      <div style={{ marginRight: "12px", color: req.status === "confirmed" ? "#22c55e" : "#cbd5e1" }}>
-                                        {req.status === "confirmed" ? <CheckCircle size={18} /> : <Circle size={18} />}
+                            <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "15px", background: "white" }}>
+                              {folder.classes?.length === 0 && <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.9rem", margin: 0 }}>No classes added.</p>}
+                              {folder.classes?.map((cls) => {
+                                const isLogisticsOpen = activeLogisticsClassId === cls.class_id;
+                                const classRes = isLogisticsOpen ? activeClassResources : []; 
+                                return (
+                                  <div key={cls.class_id} style={{ padding: "16px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0", borderLeft: "5px solid #4f46e5" }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "15px" }}>
+                                      <div>
+                                        <strong style={{ display: "block", color: "#1e293b", fontSize: "1.1rem", marginBottom: "6px" }}>{cls.name}</strong>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "13px", color: "#64748b" }}>
+                                          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><Calendar size={14} /> {cls.date?.split('T')[0]} {cls.time && `at ${cls.time}`}</span>
+                                          {cls.class_type === 'online' ? <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#4f46e5", fontWeight: "600" }}><Video size={14} /> Online: {cls.venue}</span> : <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><MapPin size={14} /> Venue: {cls.venue || "TBA"}</span>}
+                                        </div>
+                                      </div>
+                                      <div style={{ display: "flex", gap: "8px" }}>
+                                        <button onClick={() => handleLogisticsClick(cls.class_id)} style={{ padding: "8px 14px", background: isLogisticsOpen ? "#4f46e5" : "white", color: isLogisticsOpen ? "white" : "#4f46e5", border: "1px solid #4f46e5", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}>Resources</button>
+                                        <button onClick={() => handleEditClick(cls)} style={{ padding: "8px 14px", background: "white", color: "#475569", border: "1px solid #cbd5e1", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}>Edit</button>
+                                        <button onClick={() => handleDeleteClass(cls.class_id)} style={{ padding: "8px", background: "transparent", color: "#ef4444", border: "none", cursor: "pointer" }}><Trash2 size={18}/></button>
+                                      </div>
+                                    </div>
+                                    {isLogisticsOpen && (
+                                      <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid #e2e8f0" }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
+                                          <h5 style={{ margin: 0, fontSize: "14px", color: "#334155" }}>Resources</h5>
+                                          <div style={{ display: "flex", background: "#e2e8f0", padding: "4px", borderRadius: "8px" }}>
+                                            <button onClick={() => setLogisticsMode("checklist")} style={{ padding: "6px 12px", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: "bold", background: logisticsMode === "checklist" ? "white" : "transparent", color: logisticsMode === "checklist" ? "#4f46e5" : "#64748b" }}>Checklist</button>
+                                            <button onClick={() => setLogisticsMode("planning")} style={{ padding: "6px 12px", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: "bold", background: logisticsMode === "planning" ? "white" : "transparent", color: logisticsMode === "planning" ? "#4f46e5" : "#64748b" }}>Add Items</button>
+                                          </div>
+                                        </div>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                          {classRes.map(req => (
+                                            <div key={req.resource_id} onClick={() => handleToggleResourceStatus(req.resource_id, req.status)} style={{ display: "flex", alignItems: "center", padding: "12px 16px", background: req.status === "confirmed" ? "#f0fdf4" : "white", border: req.status === "confirmed" ? "1px solid #bbf7d0" : "1px solid #cbd5e1", borderRadius: "8px", cursor: "pointer" }}>
+                                              {logisticsMode === "checklist" && <div style={{ marginRight: "12px" }}>{req.status === "confirmed" ? <CheckCircle size={20} color="#059669" /> : <Circle size={20} color="#cbd5e1" />}</div>}
+                                              <span style={{ flex: 1, textDecoration: req.status === "confirmed" && logisticsMode === "checklist" ? "line-through" : "none", color: req.status === "confirmed" && logisticsMode === "checklist" ? "#94a3b8" : "#334155" }}>{req.name}</span>
+                                            </div>
+                                          ))}
+                                          {logisticsMode === "planning" && (
+                                            <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                                              <input type="text" placeholder="New requirement" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} style={{ flex: 1, padding: "10px", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+                                              <button onClick={() => handleAddInlineResource(cls.class_id)} style={{ background: "#4f46e5", color: "white", border: "none", borderRadius: "8px", padding: "0 15px", fontWeight: "bold" }}>Add</button>
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
                                     )}
-                                    <span style={{ flex: 1, textDecoration: req.status === "confirmed" && logisticsMode === "checklist" ? "line-through" : "none", opacity: req.status === "confirmed" && logisticsMode === "checklist" ? 0.6 : 1, fontSize: "14px" }}>{req.name}</span>
                                   </div>
-                                ))}
-                              </div>
-
-                              {logisticsMode === "planning" && (
-                                <div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
-                                  <input type="text" placeholder="Add requirement (e.g. Projector)" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} style={{ flex: 1, padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "14px" }} />
-                                  <button onClick={() => handleAddInlineResource(cls.class_id)} style={{ background: "#2563eb", color: "white", border: "none", borderRadius: "6px", padding: "0 15px", cursor: "pointer", fontWeight: "600", fontSize: "13px" }}><Plus size={14}/> Add</button>
-                                </div>
-                              )}
+                                );
+                              })}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
-      ))}
+          );
+        })}
+      </div>
     </div>
   );
 };
 
-const toggleBtnStyle = { display: "flex", alignItems: "center", gap: "6px", padding: "4px 10px", border: "none", borderRadius: "4px", fontSize: "12px", fontWeight: "600", cursor: "pointer" };
+const formInputStyle = {
+  padding: "12px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.95rem", outline: "none", width: "100%", boxSizing: "border-box"
+};
 
 export default EventManagement;

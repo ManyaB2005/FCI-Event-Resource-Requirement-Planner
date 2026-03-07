@@ -11,6 +11,14 @@ const getInitials = (name) => {
   return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 };
 
+// Helper function to get greeting based on time of day
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+};
+
 const Dashboard = ({ user }) => {
   const navigate = useNavigate();
   const [calendarEvents, setCalendarEvents] = useState([]);
@@ -147,7 +155,8 @@ const Dashboard = ({ user }) => {
             {getInitials(user?.name)}
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: "24px", color: "#1e293b" }}>Good day, {user?.name?.split(' ')[0]}</h1>
+            {/* UPDATED THIS LINE TO USE getGreeting() */}
+            <h1 style={{ margin: 0, fontSize: "24px", color: "#1e293b" }}>{getGreeting()}, {user?.name?.split(' ')[0]}</h1>
             <p className="subtitle" style={{ margin: "4px 0 0 0" }}>Here is your schedule and workspace overview.</p>
           </div>
         </div>

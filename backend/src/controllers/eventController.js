@@ -49,11 +49,12 @@ exports.getAllEvents = async (req, res) => {
 
 // --- EVENT CRUD ---
 exports.createEvent = async (req, res) => {
-  const { name, description, start_date, end_date } = req.body;
+  // REMOVED: description, start_date, end_date from destructuring
+  const { name } = req.body; 
   try {
     const [result] = await pool.query(
-      'INSERT INTO events (name, description, start_date, end_date) VALUES (?, ?, ?, ?)',
-      [name, description, start_date, end_date]
+      'INSERT INTO events (name) VALUES (?)', // UPDATED QUERY
+      [name]
     );
     await pool.query('INSERT INTO notifications (message, type) VALUES (?, ?)', [`New Event Announced: ${name}`, 'announcement']);
     res.status(201).json({ message: "Event created successfully", event_id: result.insertId });
@@ -67,6 +68,7 @@ exports.updateEvent = async (req, res) => {
   const { eventId } = req.params;
   const { name, type } = req.body;
   try {
+    // Note: 'type' is kept as you previously mentioned keeping it or making it optional
     await pool.query('UPDATE events SET name = ?, type = ? WHERE event_id = ?', [name, type, eventId]);
     res.json({ message: "Event updated successfully" });
   } catch (error) {
@@ -116,42 +118,33 @@ exports.deleteFolder = async (req, res) => {
 // --- CLASS CRUD ---
 exports.createClass = async (req, res) => {
   const { folderId } = req.params;
-  const { name, date, time, venue, seat_limit, requires_ppt, drive_link, resources } = req.body;
+  const { name, date, time, venue,requires_ppt, drive_link, resources } = req.body;
   
   try {
-    // 1. Save the class to the database
     const [result] = await pool.query(
-      'INSERT INTO classes (folder_id, name, date, time, venue, seat_limit, requires_ppt, drive_link) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [folderId, name, date, time, venue, seat_limit, requires_ppt, drive_link]
+      'INSERT INTO classes (folder_id, name, date, time, venue, requires_ppt, drive_link) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [folderId, name, date, time, venue, requires_ppt, drive_link]
     );
     const classId = result.insertId;
 
-    // Save resources if any exist
     if (resources && resources.length > 0) {
-      for (let res of resources) {
+      for (let resItem of resources) {
         await pool.query(
           'INSERT INTO resources (class_id, name, quantity) VALUES (?, ?, ?)',
-          [classId, res.name, res.quantity]
+          [classId, resItem.name, resItem.quantity]
         );
       }
     }
 
-    // --- AUTOMATION START ---
-    
-    // 2. Post to the Updates/Notification Feed automatically
     const announcementMsg = `New Class Added: ${name} is scheduled for ${new Date(date).toLocaleDateString()} at ${venue || 'TBA'}.`;
     await pool.query('INSERT INTO notifications (message, type) VALUES (?, ?)', [announcementMsg, 'announcement']);
 
-    // 3. Fetch all active student emails
     const [students] = await pool.query('SELECT email FROM users WHERE role = "student"');
     const studentEmails = students.map(s => s.email);
 
-    // 4. Send the email (runs in background)
     if (studentEmails.length > 0) {
       sendClassNotification(name, date, time, venue, studentEmails);
     }
-
-    // --- AUTOMATION END ---
 
     res.status(201).json({ message: "Class created, feed updated, and emails sent!", class_id: classId });
   } catch (error) {
@@ -162,15 +155,15 @@ exports.createClass = async (req, res) => {
 
 exports.updateClass = async (req, res) => {
   const { classId } = req.params;
-  const { name, date, time, venue, seat_limit, resources, requires_ppt, drive_link } = req.body;
+  const { name, date, time, venue, resources, requires_ppt, drive_link } = req.body;
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
     
     await connection.query(
-      'UPDATE classes SET name=?, date=?, time=?, venue=?, seat_limit=?, requires_ppt=?, drive_link=? WHERE class_id=?',
-      [name, date, time, venue, seat_limit || 0, requires_ppt || false, drive_link || null, classId]
+      'UPDATE classes SET name=?, date=?, time=?, venue=?, requires_ppt=?, drive_link=? WHERE class_id=?',
+      [name, date, time, venue || 0, requires_ppt || false, drive_link || null, classId]
     );
 
     await connection.query('DELETE FROM resources WHERE class_id=?', [classId]);

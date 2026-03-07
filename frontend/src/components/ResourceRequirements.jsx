@@ -62,7 +62,7 @@ const ResourceRequirements = () => {
     } catch (err) { alert(err.message); }
   };
 
-  if (loading) return <div style={{ padding: "30px" }}>Loading Logistics...</div>;
+  if (loading) return <div style={{ padding: "30px" }}>Loading Resources...</div>;
 
   return (
     <div style={{ padding: "30px", maxWidth: "1200px", margin: "0 auto" }}>
@@ -70,7 +70,7 @@ const ResourceRequirements = () => {
       {/* Header & Mode Toggle */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "30px" }}>
         <div>
-          <h1 style={{ fontSize: "28px", color: "#0f172a", marginBottom: "8px" }}>Logistics & Operations</h1>
+          <h1 style={{ fontSize: "28px", color: "#0f172a", marginBottom: "8px" }}>Required Resources</h1>
           <p style={{ color: "#64748b" }}>Manage requirements for all upcoming scheduled classes.</p>
         </div>
         

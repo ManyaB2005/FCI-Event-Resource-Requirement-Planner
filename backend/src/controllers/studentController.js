@@ -4,11 +4,12 @@ const pool = require('../config/db');
 exports.getAvailableClasses = async (req, res) => {
   try {
     // LEFT JOIN ensures classes show even if folder/event links are missing
-    // We select c.name AS class_name to keep it consistent for the frontend
+    // c.* safely ignores seat_limit since it's removed from the database
     const [rows] = await pool.query(`
       SELECT 
         c.*, 
         c.name AS class_name,
+        c.class_type,
         f.name AS folder_name, 
         e.name AS event_name 
       FROM classes c
@@ -27,39 +28,33 @@ exports.getAvailableClasses = async (req, res) => {
 exports.registerForClass = async (req, res) => {
   const { classId } = req.params;
   const userId = req.user.id;
-  const connection = await pool.getConnection();
 
   try {
-    await connection.beginTransaction();
-    
-    // Check seat limits
-    const [classData] = await connection.query(
-      `SELECT seat_limit, (SELECT COUNT(*) FROM registrations WHERE class_id = ?) as current_count FROM classes WHERE class_id = ? FOR UPDATE`,
-      [classId, classId]
+    // Check if the class actually exists first
+    const [classData] = await pool.query(
+      `SELECT class_id FROM classes WHERE class_id = ?`,
+      [classId]
     );
 
-    if (classData.length === 0) throw new Error("Class not found");
-    const { seat_limit, current_count } = classData[0];
-
-    if (seat_limit > 0 && current_count >= seat_limit) {
-      throw new Error("Class is fully booked");
+    if (classData.length === 0) {
+      return res.status(404).json({ message: "Class not found" });
     }
 
-    // IMPORTANT: Check if your table uses 'user_id' or 'student_id'. 
-    // Based on your previous error, I am using 'user_id' to match your INSERT.
-    await connection.query(
+    // Insert registration directly (No seat limits to check anymore!)
+    await pool.query(
       'INSERT INTO registrations (class_id, user_id) VALUES (?, ?)', 
       [classId, userId]
     );
     
-    await connection.commit();
     res.status(201).json({ message: "Successfully registered!" });
   } catch (error) {
-    await connection.rollback();
-    if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: "You are already registered." });
-    res.status(400).json({ message: error.message });
-  } finally {
-    connection.release();
+    // Safely handle if they double-click or try to register twice
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: "You are already registered." });
+    }
+    
+    console.error("Registration Error:", error);
+    res.status(400).json({ message: "Failed to register for class." });
   }
 };
 
@@ -67,7 +62,6 @@ exports.registerForClass = async (req, res) => {
 exports.getMyRegistrations = async (req, res) => {
   const userId = req.user.id;
   try {
-    // FIX: Changed 'WHERE student_id' to 'WHERE user_id' to match your registration logic
     const [rows] = await pool.query(`
       SELECT 
         r.registration_id, 
@@ -77,6 +71,7 @@ exports.getMyRegistrations = async (req, res) => {
         c.date, 
         c.time, 
         c.venue, 
+        c.class_type,
         c.drive_link, 
         c.requires_ppt
       FROM registrations r

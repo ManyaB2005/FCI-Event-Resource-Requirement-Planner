@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, User, Shield, Users } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Users } from 'lucide-react';
 import './Auth.css';
+import logo from './logo.jpeg'; 
 
 const Auth = ({ setToken, setUser }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -10,7 +11,6 @@ const Auth = ({ setToken, setUser }) => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 1. ADDED 'batch' to the initial state
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -37,7 +37,6 @@ const Auth = ({ setToken, setUser }) => {
     setLoading(true);
     const endpoint = isLogin ? 'http://localhost:5000/api/auth/login' : 'http://localhost:5000/api/auth/register';
     
-    // 2. ADDED 'batch' to the payload being sent to the backend
     const payload = {
       name: formData.name,
       email: formData.email,
@@ -54,20 +53,12 @@ const Auth = ({ setToken, setUser }) => {
       });
 
       const contentType = response.headers.get("content-type");
-      
       let data = {};
       
       if (contentType && contentType.includes("application/json")) {
-         data = await response.json(); 
+          data = await response.json(); 
       } else {
-         const textError = await response.text();
-         console.error("Non-JSON Server Response:", textError);
-         
-         if (response.status === 404) {
-           throw new Error(`The URL ${endpoint} does not exist on the server (404 Error). Check Backend Router.`);
-         } else {
-           throw new Error(`Server returned an invalid format. Status: ${response.status}`);
-         }
+          throw new Error("Server returned an invalid format.");
       }
 
       if (!response.ok) {
@@ -75,6 +66,12 @@ const Auth = ({ setToken, setUser }) => {
       }
 
       if (isLogin) {
+        // --- ROLE SECURITY CHECK ---
+        // Verify if the user's actual role matches what they selected on the login page
+        if (data.user.role !== formData.role) {
+          throw new Error(`Access Denied: You are registered as a ${data.user.role}. Please select the correct Access Level.`);
+        }
+
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         setToken(data.token);
@@ -82,7 +79,6 @@ const Auth = ({ setToken, setUser }) => {
       } else {
         setSuccess("Account created successfully! You can now log in.");
         setIsLogin(true); 
-        // Reset passwords and batch upon successful registration
         setFormData({ ...formData, password: '', confirmPassword: '', batch: '' });
       }
     } catch (err) {
@@ -96,7 +92,7 @@ const Auth = ({ setToken, setUser }) => {
     setIsLogin(!isLogin);
     setError('');
     setSuccess('');
-    setFormData({ ...formData, password: '', confirmPassword: '' });
+    setFormData({ ...formData, password: '', confirmPassword: '', role: 'student' });
   };
 
   return (
@@ -104,8 +100,12 @@ const Auth = ({ setToken, setUser }) => {
       <div className="auth-card">
         
         <div className="auth-header">
-          <div className="auth-icon-container">
-            <Shield size={36} className="auth-brand-icon" />
+          <div className="auth-icon-container" style={{ background: 'transparent', padding: 0 }}>
+            <img 
+              src={logo} 
+              alt="Platform Logo" 
+              style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '50%', marginBottom: '10px', border: '2px solid #6366f1' }} 
+            />
           </div>
           <h2>{isLogin ? 'Login' : 'Student Registration'}</h2>
           <p>{isLogin ? 'Authenticate to access your workspace' : 'Create an account to join events'}</p>
@@ -122,30 +122,15 @@ const Auth = ({ setToken, setUser }) => {
                 <label>Full Name</label>
                 <div className="input-wrapper">
                   <User className="input-icon" size={18} />
-                  <input 
-                    type="text" 
-                    name="name" 
-                    placeholder="e.g. Jane Doe" 
-                    value={formData.name} 
-                    onChange={handleChange} 
-                    required={!isLogin} 
-                  />
+                  <input type="text" name="name" placeholder="e.g. Jane Doe" value={formData.name} onChange={handleChange} required={!isLogin} />
                 </div>
               </div>
 
-              {/* 3. ADDED the new Batch input field for Student Registration */}
               <div className="input-group">
                 <label>Batch</label>
                 <div className="input-wrapper">
                   <Users className="input-icon" size={18} />
-                  <input 
-                    type="text" 
-                    name="batch" 
-                    placeholder="e.g. 5" 
-                    value={formData.batch} 
-                    onChange={handleChange} 
-                    required={!isLogin} 
-                  />
+                  <input type="text" name="batch" placeholder="e.g. 5" value={formData.batch} onChange={handleChange} required={!isLogin} />
                 </div>
               </div>
             </>
@@ -155,14 +140,7 @@ const Auth = ({ setToken, setUser }) => {
             <label>Email Address</label>
             <div className="input-wrapper">
               <Mail className="input-icon" size={18} />
-              <input 
-                type="email" 
-                name="email" 
-                placeholder="you@example.com" 
-                value={formData.email} 
-                onChange={handleChange} 
-                required 
-              />
+              <input type="email" name="email" placeholder="you@example.com" value={formData.email} onChange={handleChange} required />
             </div>
           </div>
 
@@ -170,20 +148,8 @@ const Auth = ({ setToken, setUser }) => {
             <label>Password</label>
             <div className="input-wrapper">
               <Lock className="input-icon" size={18} />
-              <input 
-                type={showPassword ? "text" : "password"} 
-                name="password" 
-                placeholder="••••••••" 
-                value={formData.password} 
-                onChange={handleChange} 
-                required 
-              />
-              <button 
-                type="button" 
-                className="eye-btn" 
-                onClick={() => setShowPassword(!showPassword)}
-                tabIndex="-1"
-              >
+              <input type={showPassword ? "text" : "password"} name="password" placeholder="••••••••" value={formData.password} onChange={handleChange} required />
+              <button type="button" className="eye-btn" onClick={() => setShowPassword(!showPassword)} tabIndex="-1">
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
@@ -194,20 +160,8 @@ const Auth = ({ setToken, setUser }) => {
               <label>Confirm Password</label>
               <div className="input-wrapper">
                 <Lock className="input-icon" size={18} />
-                <input 
-                  type={showConfirmPassword ? "text" : "password"} 
-                  name="confirmPassword" 
-                  placeholder="••••••••" 
-                  value={formData.confirmPassword} 
-                  onChange={handleChange} 
-                  required={!isLogin} 
-                />
-                <button 
-                  type="button" 
-                  className="eye-btn" 
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  tabIndex="-1"
-                >
+                <input type={showConfirmPassword ? "text" : "password"} name="confirmPassword" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} required={!isLogin} />
+                <button type="button" className="eye-btn" onClick={() => setShowConfirmPassword(!showConfirmPassword)} tabIndex="-1">
                   {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
@@ -241,7 +195,6 @@ const Auth = ({ setToken, setUser }) => {
             {isLogin ? 'Create an account' : 'Sign in here'}
           </button>
         </div>
-
       </div>
     </div>
   );

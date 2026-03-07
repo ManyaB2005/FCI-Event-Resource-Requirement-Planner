@@ -3,7 +3,7 @@ const pool = require('./src/config/db');
 
 async function ensureAdminUser() {
   try {
-    const email = 'manya.manvith@gmail.com';
+    const email = 'manyamannu0@gmail.com';
     const password = 'admin';
     
     const newHash = await bcrypt.hash(password, 10);
